@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaushal Lens — Skilling Outcome Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1a1f2b; --paper:#f6f4ee; --accent:#c1442d; --accent2:#1f6f5c;
+    --line:#d8d2c4; --muted:#6b6558;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Georgia','Times New Roman',serif; background:var(--paper); color:var(--ink);}
+  header{padding:28px 32px 18px; border-bottom:3px solid var(--ink); display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;}
+  header h1{margin:0 0 4px; font-size:1.7rem; letter-spacing:-0.5px;}
+  header p{margin:0; color:var(--muted); font-size:0.95rem;}
+  .backbtn{background:none;border:1px solid var(--ink);padding:7px 14px;font-family:inherit;cursor:pointer;font-size:0.85rem;}
+  .backbtn:hover{background:var(--ink); color:var(--paper);}
+
+  .hook{margin:24px 32px; padding:22px 26px; background:var(--ink); color:var(--paper); border-radius:2px; display:flex; align-items:center; gap:28px; flex-wrap:wrap;}
+  .hook .stat{font-size:2.6rem; font-weight:bold; color:#e8c27a; line-height:1;}
+  .hook .statlabel{font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; color:#cfc9b8;}
+  .hook .text{flex:1; min-width:240px; font-size:1.05rem;}
+  .hook .src{font-size:0.72rem; color:#9d9683; margin-top:6px;}
+
+  section{margin:30px 32px;}
+  section h2{font-size:1.05rem; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:16px;}
+  .row{display:flex; gap:24px; flex-wrap:wrap;}
+  .card{background:#fffdf8; border:1px solid var(--line); border-radius:2px; padding:18px; flex:1; min-width:320px;}
+  select{font-family:inherit; padding:8px 12px; border:1px solid var(--line); background:#fff; font-size:0.95rem; margin-bottom:10px; width:100%;}
+  table{width:100%; border-collapse:collapse; font-size:0.88rem;}
+  th,td{text-align:left; padding:7px 8px; border-bottom:1px solid var(--line);}
+  th{font-weight:normal; color:var(--muted); text-transform:uppercase; font-size:0.72rem; letter-spacing:0.5px;}
+  tr.flag td{background:#f8e2dc;}
+  .badge{display:inline-block; font-size:0.7rem; padding:2px 7px; border-radius:10px; background:var(--accent); color:#fff; margin-left:6px;}
+  .insight{background:#eef4ef; border-left:4px solid var(--accent2); padding:16px 20px; font-size:1rem; line-height:1.5;}
+  .insight.warn{background:#fbeee9; border-left-color:var(--accent);}
+  .note{background:#fff8e8; border-left:4px solid #d9a441; padding:12px 16px; font-size:0.85rem; color:#6b5320; margin-bottom:14px;}
+  footer{padding:20px 32px 40px; font-size:0.75rem; color:var(--muted);}
+  canvas{max-height:300px;}
+
+  /* --- page 1: selector screen --- */
+  #page-select{max-width:640px; margin:60px auto; text-align:center;}
+  #page-select h1{font-size:2rem; margin-bottom:6px;}
+  #page-select p{color:var(--muted); margin-bottom:36px;}
+  #page-select .picker{background:#fffdf8; border:1px solid var(--line); padding:32px; text-align:left;}
+  #page-select label{font-size:0.78rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted); display:block; margin-bottom:4px; margin-top:18px;}
+  #page-select label:first-of-type{margin-top:0;}
+  #goBtn{margin-top:24px; width:100%; padding:14px; background:var(--accent); color:#fff; border:none; font-family:inherit; font-size:1rem; cursor:pointer;}
+  #goBtn:hover{background:#a3381f;}
+  .page{display:none;}
+  .page.active{display:block;}
+</style>
+</head>
+<body>
+
+<!-- ===================== PAGE 1: STATE / DISTRICT SELECTOR ===================== -->
+<div id="page-select" class="page active">
+  <h1>Kaushal Lens</h1>
+  <p>Tracking whether India's skilling schemes actually lead to jobs.</p>
+  <div class="picker">
+    <label for="stateSelect">1 · Select a state / UT</label>
+    <select id="stateSelect">
+      <option value="" selected disabled>e.g., Maharashtra, Tamil Nadu, Kerala…</option>
+    </select>
+
+    <label for="districtSelect">2 · Select a district</label>
+    <select id="districtSelect"></select>
+    <div id="districtNote" class="note" style="display:none;"></div>
+
+    <button id="goBtn">View dashboard →</button>
+  </div>
+</div>
+
+<!-- ===================== PAGE 2: DASHBOARD ===================== -->
+<div id="page-dashboard" class="page">
+
+<header>
+  <div>
+    <h1 id="dashTitle">Kaushal Lens</h1>
+    <p id="dashSubtitle">Tracking skilling outcomes.</p>
+  </div>
+  <button class="backbtn" id="backBtn">← Change state / district</button>
+</header>
+
+<div class="hook">
+  <div>
+    <div class="statlabel" id="hookLabel">Placement rate</div>
+    <div class="stat" id="hookStat">—</div>
+  </div>
+  <div class="text" id="hookText"></div>
+</div>
+
+<section>
+  <h2>1 · Candidates trained vs placed — selected state</h2>
+  <div class="card"><canvas id="stateChart"></canvas></div>
+</section>
+
+<section>
+  <h2>2 · Top performers vs bottom performers nationally</h2>
+  <div class="row">
+    <div class="card">
+      <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent2);">🏆 Highest placement rate</h3>
+      <table><thead><tr><th>State</th><th>Trained</th><th>Placed</th><th>Rate</th></tr></thead><tbody id="topStatesBody"></tbody></table>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent);">⚠ Lowest placement rate</h3>
+      <table><thead><tr><th>State</th><th>Trained</th><th>Placed</th><th>Rate</th></tr></thead><tbody id="bottomStatesBody"></tbody></table>
+    </div>
+  </div>
+</section>
+
+<section id="districtSection">
+  <h2>3 · District trend</h2>
+  <div class="card" id="districtCard"></div>
+</section>
+
+<section>
+  <h2>4 · School → higher education → jobs pipeline (India, national)</h2>
+  <div class="note">
+    This panel uses <b>national-level</b> figures (UDISE+ / AISHE), because district-wise
+    school-to-college transition data isn't publicly broken down the way PMKVY placement data is.
+    Treat this as the national backdrop for the state you picked, not a state-specific number.
+  </div>
+  <div class="row">
+    <div class="card" style="flex:2;"><canvas id="pipelineChart"></canvas></div>
+    <div class="card" style="flex:1;min-width:280px;">
+      <h3 style="margin-top:0;font-size:0.9rem;">Commonly cited reasons students stop after school</h3>
+      <ul style="font-size:0.88rem; line-height:1.6; padding-left:18px;">
+        <li>Financial constraints / need to earn income</li>
+        <li>No college nearby / access &amp; distance</li>
+        <li>Marriage or family responsibilities (disproportionately affects girls)</li>
+        <li>Low perceived value of a degree for the local job market</li>
+        <li>Lack of interest or preparedness after school</li>
+      </ul>
+      <p style="font-size:0.72rem;color:var(--muted);">
+        Reasons listed qualitatively per patterns reported in NSSO/PLFS-style education surveys.
+        Exact percentage breakdowns were not available in this build — verify before quoting numbers on stage.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>5 · Recommended action for the selected state</h2>
+  <div class="insight" id="recoBox"></div>
+</section>
+
+<footer>
+  Kaushal Lens — built for SIH26135 (Difficulties in tracking employment outcomes, skill gaps, and the impact of skilling initiatives).
+  PMKVY data: Govt. of India, MSDE — Lok Sabha Q.117 (22.07.2024) &amp; Rajya Sabha Q.1082 (31.07.2024).
+  Education pipeline data: UDISE+ 2024-25, AISHE 2023-24, Economic Survey 2024-25.
+  This is a hackathon prototype using real published government data; it is not an official government tool.
+</footer>
+
+</div>
+
+<script>
+// ============ REAL DATA ============
+// SOURCE: Rajya Sabha Unstarred Q.1082, answered 31.07.2024, MSDE
+// https://skilldevelopment.gov.in/sites/default/files/2024-07/Annexure Part C and D Ru 1082.pdf
+const STATE_DATA = [
+  { state:"Andaman & Nicobar Islands", trained:1772, placed:0 },
+  { state:"Andhra Pradesh", trained:64858, placed:7869 },
+  { state:"Arunachal Pradesh", trained:17517, placed:7933 },
+  { state:"Assam", trained:103938, placed:16908 },
+  { state:"Bihar", trained:100609, placed:18735 },
+  { state:"Chandigarh", trained:2118, placed:475 },
+  { state:"Chhattisgarh", trained:28281, placed:1947 },
+  { state:"Delhi", trained:35553, placed:3954 },
+  { state:"Goa", trained:1086, placed:47 },
+  { state:"Gujarat", trained:80426, placed:3388 },
+  { state:"Haryana", trained:75581, placed:4168 },
+  { state:"Himachal Pradesh", trained:22179, placed:2154 },
+  { state:"Jammu & Kashmir", trained:93967, placed:4081 },
+  { state:"Jharkhand", trained:59256, placed:3323 },
+  { state:"Karnataka", trained:56900, placed:6253 },
+  { state:"Kerala", trained:29952, placed:3961 },
+  { state:"Ladakh", trained:1616, placed:119 },
+  { state:"Lakshadweep", trained:120, placed:0 },
+  { state:"Madhya Pradesh", trained:141469, placed:17634 },
+  { state:"Maharashtra", trained:110184, placed:7676 },
+  { state:"Manipur", trained:15475, placed:3604 },
+  { state:"Meghalaya", trained:10318, placed:6808 },
+  { state:"Mizoram", trained:11758, placed:1743 },
+  { state:"Nagaland", trained:13348, placed:1139 },
+  { state:"Odisha", trained:57104, placed:4504 },
+  { state:"Puducherry", trained:4719, placed:817 },
+  { state:"Punjab", trained:71232, placed:10426 },
+  { state:"Rajasthan", trained:153505, placed:17082 },
+  { state:"Sikkim", trained:5343, placed:1058 },
+  { state:"Tamil Nadu", trained:102009, placed:5176 },
+  { state:"Telangana", trained:43021, placed:5349 },
+  { state:"Dadra & Nagar Haveli and Daman & Diu", trained:608, placed:32 },
+  { state:"Tripura", trained:20166, placed:3841 },
+  { state:"Uttar Pradesh", trained:263916, placed:22204 },
+  { state:"Uttarakhand", trained:35815, placed:4313 },
+  { state:"West Bengal", trained:78771, placed:6099 }
+];
+STATE_DATA.forEach(s => s.rate = +(s.placed / s.trained * 100).toFixed(1));
+
+// SOURCE: Lok Sabha Unstarred Q.117, answered 22.07.2024, MSDE (Annexure-II)
+// Only Maharashtra has real district-level data available in this build.
+const DISTRICT_DATA = {
+  "Maharashtra": [
+    { district: "Ahmednagar", y2019: 313, y2020: 368, y2021: 208 },
+    { district: "Akola", y2019: 542, y2020: 68, y2021: 64 },
+    { district: "Amravati", y2019: 901, y2020: 272, y2021: 90 },
+    { district: "Aurangabad", y2019: 761, y2020: 168, y2021: 31 },
+    { district: "Beed", y2019: 974, y2020: 253, y2021: 354 },
+    { district: "Bhandara", y2019: 405, y2020: 134, y2021: 193 },
+    { district: "Buldhana", y2019: 879, y2020: 172, y2021: 118 },
+    { district: "Chandrapur", y2019: 596, y2020: 95, y2021: 12 },
+    { district: "Dhule", y2019: 1223, y2020: 138, y2021: 12 },
+    { district: "Gadchiroli", y2019: 943, y2020: 142, y2021: 13 },
+    { district: "Gondia", y2019: 756, y2020: 360, y2021: 817 },
+    { district: "Hingoli", y2019: 302, y2020: 155, y2021: 244 },
+    { district: "Jalgaon", y2019: 1268, y2020: 402, y2021: 15 },
+    { district: "Jalna", y2019: 475, y2020: 552, y2021: 34 },
+    { district: "Kolhapur", y2019: 980, y2020: 555, y2021: 1901 },
+    { district: "Latur", y2019: 714, y2020: 110, y2021: 296 },
+    { district: "Mumbai", y2019: 38, y2020: 3, y2021: 8 },
+    { district: "Mumbai Suburban", y2019: 0, y2020: 147, y2021: 39 },
+    { district: "Nagpur", y2019: 614, y2020: 590, y2021: 501 },
+    { district: "Nanded", y2019: 704, y2020: 121, y2021: 32 },
+    { district: "Nandurbar", y2019: 917, y2020: 91, y2021: 0 },
+    { district: "Nashik", y2019: 1855, y2020: 313, y2021: 72 },
+    { district: "Osmanabad", y2019: 506, y2020: 43, y2021: 8 },
+    { district: "Palghar", y2019: 765, y2020: 18, y2021: 0 },
+    { district: "Parbhani", y2019: 208, y2020: 321, y2021: 151 },
+    { district: "Pune", y2019: 2362, y2020: 752, y2021: 647 },
+    { district: "Raigad", y2019: 141, y2020: 101, y2021: 21 },
+    { district: "Ratnagiri", y2019: 72, y2020: 0, y2021: 0 },
+    { district: "Sangli", y2019: 701, y2020: 97, y2021: 106 },
+    { district: "Satara", y2019: 535, y2020: 394, y2021: 100 },
+    { district: "Sindhudurg", y2019: 0, y2020: 312, y2021: 0 },
+    { district: "Solapur", y2019: 201, y2020: 348, y2021: 671 },
+    { district: "Thane", y2019: 784, y2020: 156, y2021: 79 },
+    { district: "Wardha", y2019: 399, y2020: 285, y2021: 96 },
+    { district: "Washim", y2019: 509, y2020: 241, y2021: 0 },
+    { district: "Yavatmal", y2019: 630, y2020: 553, y2021: 156 }
+  ],
+  // SOURCE: Lok Sabha Unstarred Q.1071, answered 12.12.2024, MSDE — partial: only 3 districts
+  // were named in this specific reply, not all of Jharkhand's districts.
+  "Jharkhand": [
+    { district: "Chatra", y2019: null, y2020: null, y2021: null, trainedTotal: 6888, placedTotal: 786 },
+    { district: "Hazaribagh", y2019: null, y2020: null, y2021: null, trainedTotal: 30372, placedTotal: 2053 },
+    { district: "Ramgarh", y2019: null, y2020: null, y2021: null, trainedTotal: 18705, placedTotal: 1233 }
+  ],
+  // SOURCE: Lok Sabha Unstarred Q.169, answered 2024/25, MSDE — partial: only 2 districts
+  // were named in this specific reply, not all of Odisha's districts.
+  "Odisha": [
+    { district: "Kalahandi", y2019: null, y2020: null, y2021: null, trainedTotal: 14343, placedTotal: 1386 },
+    { district: "Nuapada", y2019: null, y2020: null, y2021: null, trainedTotal: 5338, placedTotal: 1028 }
+  ],
+  // SOURCE: Lok Sabha Unstarred Q.2074, answered 05.08.2024, MSDE — TRAINED counts only
+  // (this reply did not include district-wise placed figures for Tamil Nadu).
+  "Tamil Nadu": [
+    { district:"Ariyalur", trained2122:805, trained2223:0, trained2324:480 },
+    { district:"Chengalpattu", trained2122:1, trained2223:0, trained2324:140 },
+    { district:"Chennai", trained2122:3591, trained2223:1427, trained2324:3680 },
+    { district:"Coimbatore", trained2122:1628, trained2223:574, trained2324:2922 },
+    { district:"Cuddalore", trained2122:1141, trained2223:288, trained2324:937 },
+    { district:"Dharmapuri", trained2122:271, trained2223:240, trained2324:502 },
+    { district:"Dindigul", trained2122:1451, trained2223:285, trained2324:625 },
+    { district:"Erode", trained2122:1065, trained2223:260, trained2324:1215 },
+    { district:"Kallakurichi", trained2122:0, trained2223:20, trained2324:0 },
+    { district:"Kanchipuram", trained2122:2634, trained2223:35, trained2324:1204 },
+    { district:"Kanniyakumari", trained2122:21, trained2223:40, trained2324:727 },
+    { district:"Karur", trained2122:670, trained2223:210, trained2324:456 },
+    { district:"Krishnagiri", trained2122:270, trained2223:270, trained2324:1131 },
+    { district:"Madurai", trained2122:524, trained2223:560, trained2324:840 },
+    { district:"Nagapattinam", trained2122:297, trained2223:467, trained2324:880 },
+    { district:"Namakkal", trained2122:674, trained2223:261, trained2324:1800 },
+    { district:"Perambalur", trained2122:376, trained2223:0, trained2324:748 },
+    { district:"Pudukkottai", trained2122:100, trained2223:0, trained2324:341 },
+    { district:"Ramanathapuram", trained2122:1015, trained2223:351, trained2324:0 },
+    { district:"Ranipet", trained2122:59, trained2223:0, trained2324:517 },
+    { district:"Salem", trained2122:490, trained2223:0, trained2324:613 },
+    { district:"Sivaganga", trained2122:941, trained2223:200, trained2324:397 },
+    { district:"Tenkasi", trained2122:0, trained2223:0, trained2324:25 },
+    { district:"Thanjavur", trained2122:714, trained2223:0, trained2324:779 },
+    { district:"The Nilgiris", trained2122:543, trained2223:240, trained2324:1220 },
+    { district:"Theni", trained2122:73, trained2223:0, trained2324:236 },
+    { district:"Thiruvallur", trained2122:3013, trained2223:396, trained2324:2648 },
+    { district:"Thiruvarur", trained2122:881, trained2223:245, trained2324:693 },
+    { district:"Tiruchirappalli", trained2122:675, trained2223:172, trained2324:1552 },
+    { district:"Tirunelveli", trained2122:326, trained2223:0, trained2324:812 },
+    { district:"Tirupathur", trained2122:270, trained2223:70, trained2324:443 },
+    { district:"Tiruppur", trained2122:393, trained2223:270, trained2324:50 },
+    { district:"Tiruvannamalai", trained2122:948, trained2223:132, trained2324:2936 },
+    { district:"Tuticorin", trained2122:214, trained2223:0, trained2324:386 },
+    { district:"Vellore", trained2122:1745, trained2223:615, trained2324:1422 },
+    { district:"Villupuram", trained2122:856, trained2223:249, trained2324:566 },
+    { district:"Virudhunagar", trained2122:382, trained2223:152, trained2324:598 }
+  ]
+};
+
+// SOURCE: UDISE+ 2024-25 / AISHE 2023-24 / Economic Survey 2024-25 (national figures)
+const PIPELINE = {
+  secondaryDropoutRate: 11.5,       // %
+  secondaryToHSTransition: 75.1,    // %
+  higherEdGER: 30.0                 // % of 18-23 age group enrolled in higher education
+};
+
+// ============ PAGE 1 LOGIC ============
+const stateSel = document.getElementById('stateSelect');
+const distSel = document.getElementById('districtSelect');
+const distNote = document.getElementById('districtNote');
+
+STATE_DATA.slice().sort((a,b)=>a.state.localeCompare(b.state)).forEach(s => {
+  const opt = document.createElement('option');
+  opt.value = s.state; opt.textContent = s.state;
+  stateSel.appendChild(opt);
+});
+
+function populateDistricts(){
+  if(!stateSel.value){
+    distSel.innerHTML = '<option value="">(select a state first)</option>';
+    distSel.disabled = true;
+    distNote.style.display = 'none';
+    return;
+  }
+  distSel.innerHTML = '';
+  const list = DISTRICT_DATA[stateSel.value];
+  if(list){
+    distNote.style.display = 'none';
+    list.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.district; opt.textContent = d.district;
+      distSel.appendChild(opt);
+    });
+    distSel.disabled = false;
+  } else {
+    distNote.style.display = 'block';
+    distNote.textContent = `District-level PMKVY data for ${stateSel.value} isn't in this prototype yet — dashboard will show state-level figures only.`;
+    const opt = document.createElement('option');
+    opt.value = ''; opt.textContent = '(state-level only)';
+    distSel.appendChild(opt);
+    distSel.disabled = true;
+  }
+}
+populateDistricts();
+stateSel.addEventListener('change', populateDistricts);
+
+document.getElementById('goBtn').addEventListener('click', () => {
+  if(!stateSel.value){
+    stateSel.style.borderColor = 'var(--accent)';
+    stateSel.focus();
+    return;
+  }
+  renderDashboard(stateSel.value, distSel.disabled ? null : distSel.value);
+  document.getElementById('page-select').classList.remove('active');
+  document.getElementById('page-dashboard').classList.add('active');
+  window.scrollTo(0,0);
+});
+document.getElementById('backBtn').addEventListener('click', () => {
+  document.getElementById('page-dashboard').classList.remove('active');
+  document.getElementById('page-select').classList.add('active');
+});
+
+// ============ PAGE 2 LOGIC ============
+let stateChart, districtTrendChart, dropChart, pipelineChart;
+
+function renderDashboard(stateName, districtName){
+  const s = STATE_DATA.find(x => x.state === stateName);
+
+  document.getElementById('dashTitle').textContent = `Kaushal Lens — ${stateName}`;
+  document.getElementById('dashSubtitle').textContent = districtName ? `District focus: ${districtName}` : `State-level view`;
+  document.getElementById('hookLabel').textContent = `${stateName} PMKVY placement rate`;
+  document.getElementById('hookStat').textContent = s.rate + '%';
+  const natAvg = 18;
+  document.getElementById('hookText').innerHTML =
+    `${s.trained.toLocaleString('en-IN')} candidates trained, ${s.placed.toLocaleString('en-IN')} reported placed —
+     ${s.rate < natAvg ? 'below' : 'above'} the national average of ~${natAvg}%.
+     <div class="src">Source: MSDE, Rajya Sabha Unstarred Q.1082, 31.07.2024.</div>`;
+
+  // Chart 1: state trained vs placed
+  if(stateChart) stateChart.destroy();
+  stateChart = new Chart(document.getElementById('stateChart'), {
+    type:'bar',
+    data:{ labels:['Candidates trained','Candidates placed'],
+      datasets:[{ data:[s.trained, s.placed], backgroundColor:['#8c8570','#c1442d'] }] },
+    options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+
+  // Leaderboard (always national, doesn't change with selection)
+  const topBody = document.getElementById('topStatesBody');
+  const botBody = document.getElementById('bottomStatesBody');
+  topBody.innerHTML = ''; botBody.innerHTML = '';
+  const byRate = STATE_DATA.slice().sort((a,b)=>b.rate-a.rate);
+  byRate.slice(0,5).forEach(r => topBody.innerHTML += `<tr><td>${r.state}</td><td>${r.trained.toLocaleString('en-IN')}</td><td>${r.placed.toLocaleString('en-IN')}</td><td>${r.rate}%</td></tr>`);
+  byRate.slice(-5).reverse().forEach(r => botBody.innerHTML += `<tr class="flag"><td>${r.state}</td><td>${r.trained.toLocaleString('en-IN')}</td><td>${r.placed.toLocaleString('en-IN')}</td><td>${r.rate}%</td></tr>`);
+
+  // District section — only real for Maharashtra
+  const distCard = document.getElementById('districtCard');
+  const distList = DISTRICT_DATA[stateName];
+  if(distList && districtName){
+    const d = distList.find(x => x.district === districtName);
+    if(d.y2019 !== undefined && d.y2019 !== null){
+      distCard.innerHTML = `<canvas id="districtTrendChart"></canvas>`;
+      if(districtTrendChart) districtTrendChart.destroy();
+      districtTrendChart = new Chart(document.getElementById('districtTrendChart'), {
+        type:'line',
+        data:{ labels:['2019-20','2020-21','2021-22'],
+          datasets:[{ label:districtName+' — candidates placed', data:[d.y2019,d.y2020,d.y2021],
+            borderColor:'#c1442d', backgroundColor:'rgba(193,68,45,0.12)', fill:true, tension:0.25, pointRadius:5 }] },
+        options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+      });
+    } else if(d.trained2122 !== undefined){
+      distCard.innerHTML = `<div class="note" style="margin:0 0 12px;">
+        This reply reported <b>candidates trained</b> only, not placed, for Tamil Nadu districts —
+        shown here as a training-volume trend, not a placement outcome.</div>
+        <canvas id="districtTrendChart"></canvas>`;
+      if(districtTrendChart) districtTrendChart.destroy();
+      districtTrendChart = new Chart(document.getElementById('districtTrendChart'), {
+        type:'line',
+        data:{ labels:['2021-22','2022-23','2023-24'],
+          datasets:[{ label:districtName+' — candidates trained', data:[d.trained2122,d.trained2223,d.trained2324],
+            borderColor:'#1f6f5c', backgroundColor:'rgba(31,111,92,0.12)', fill:true, tension:0.25, pointRadius:5 }] },
+        options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+      });
+    } else {
+      distCard.innerHTML = `<div class="note" style="margin:0 0 12px;">
+        Only a single-point total is available for ${districtName} (as on 31.10.2024) from the
+        parliamentary reply this was sourced from — not a year-by-year trend like Maharashtra.</div>
+        <canvas id="districtTrendChart"></canvas>`;
+      if(districtTrendChart) districtTrendChart.destroy();
+      districtTrendChart = new Chart(document.getElementById('districtTrendChart'), {
+        type:'bar',
+        data:{ labels:['Candidates trained','Candidates placed'],
+          datasets:[{ data:[d.trainedTotal, d.placedTotal], backgroundColor:['#8c8570','#c1442d'] }] },
+        options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+      });
+    }
+  } else {
+    distCard.innerHTML = `<div class="note" style="margin:0;">
+      District-level PMKVY data for <b>${stateName}</b> isn't available in this prototype build —
+      only Maharashtra has real district-wise figures loaded right now. This section would populate
+      the same way once district data for ${stateName} is added.</div>`;
+  }
+
+  // Pipeline chart (national, same regardless of state — labeled as such)
+  if(pipelineChart) pipelineChart.destroy();
+  pipelineChart = new Chart(document.getElementById('pipelineChart'), {
+    type:'bar',
+    data:{
+      labels:['Complete secondary school','Transition to higher secondary','Enrol in higher education (GER)'],
+      datasets:[{
+        data:[100 - PIPELINE.secondaryDropoutRate, PIPELINE.secondaryToHSTransition, PIPELINE.higherEdGER],
+        backgroundColor:['#1f6f5c','#8c8570','#c1442d']
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{x:{beginAtZero:true, max:100, ticks:{callback:v=>v+'%'}}}
+    }
+  });
+
+  // Recommendation
+  let reco;
+  if(s.rate < 10){
+    reco = `<b>${stateName}</b> is placing under <b>10%</b> of trained candidates — among the weakest
+     conversion rates nationally. Recommended: pause expansion of training volume here and run a
+     skill-gap audit against local job postings before enrolling more candidates in the same courses.`;
+  } else if(s.rate < 20){
+    reco = `<b>${stateName}</b> sits close to the national average (~18%). Recommended: identify the
+     training centres or trades with the worst placement ratio and re-align their course mix with
+     local industry demand, rather than a blanket state-wide policy change.`;
+  } else {
+    reco = `<b>${stateName}</b> is placing candidates at a rate above the national average.
+     Recommended: study which training partners or trades are driving this and replicate that model
+     in lower-performing states.`;
+  }
+  reco += ` <span style="font-size:0.78rem;color:var(--muted);">(Rule-based on placement-rate thresholds — transparent, not a black-box score.)</span>`;
+  const recoBox = document.getElementById('recoBox');
+  recoBox.className = 'insight' + (s.rate < 10 ? ' warn' : '');
+  recoBox.innerHTML = reco;
+}
+</script>
+</body>
+</html>
